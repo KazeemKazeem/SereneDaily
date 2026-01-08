@@ -19,13 +19,21 @@ const Auth: React.FC = () => {
     setLoading(true);
     
     try {
-      // Direct login for immediate response
-      const user = await dbService.login(email);
+      let user;
+      if (isLogin) {
+        user = await dbService.login(email, password);
+      } else {
+        user = await dbService.signUp(email, password);
+        alert("Sign up successful! Please log in.");
+        setIsLogin(true);
+        setLoading(false);
+        return;
+      }
       setUser(user);
       navigate('/onboarding');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Something went wrong. Please try again.");
+      alert(err.message || "Something went wrong. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -90,7 +98,7 @@ const Auth: React.FC = () => {
         </button>
         <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
           <div className="w-4 h-[1px] bg-slate-200 dark:bg-slate-800" />
-          <span>Sync across devices</span>
+          <span>Sync via Supabase</span>
           <div className="w-4 h-[1px] bg-slate-200 dark:bg-slate-800" />
         </div>
       </div>

@@ -1,132 +1,135 @@
 
+import { createClient } from '@supabase/supabase-js';
 import { JournalEntry, Activity, Task, User, MoodValue } from '../types';
 
-const STORAGE_KEY = 'serene_daily_db_v2';
+const SUPABASE_URL = 'https://vylgegxwfgztliwnhbtn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5bGdlZ3h3Zmd6dGxpd25oYnRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTEzMjYsImV4cCI6MjA3NDcyNzMyNn0.yvDcP0pMSHMmYS_2-khO-88TMLQhS5f8WraofMgjyco';
 
-interface DBStore {
-  user: User | null;
-  entries: JournalEntry[];
-  activities: Activity[];
-  tasks: Task[];
-}
-
-const getDB = (): DBStore => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return { user: null, entries: [], activities: [], tasks: [] };
-    return JSON.parse(data);
-  } catch (e) {
-    console.error("DB Load Error", e);
-    return { user: null, entries: [], activities: [], tasks: [] };
-  }
-};
-
-const saveDB = (db: DBStore) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-};
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export const dbService = {
   getCurrentUser: async (): Promise<User | null> => {
-    return getDB().user;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email || '',
+      onboarded: true // Simplified for now
+    };
   },
 
-  login: async (email: string): Promise<User> => {
-    const db = getDB();
-    const user: User = { id: 'u1', email, onboarded: true };
-    db.user = user;
-    saveDB(db);
-    return user;
+  login: async (email: string, password: string): Promise<User> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return {
+      id: data.user.id,
+      email: data.user.email || '',
+      onboarded: true
+    };
+  },
+
+  signUp: async (email: string, password: string): Promise<User> => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    if (!data.user) throw new Error("Sign up failed");
+    return {
+      id: data.user.id,
+      email: data.user.email || '',
+      onboarded: true
+    };
   },
 
   logout: async () => {
-    const db = getDB();
-    db.user = null;
-    saveDB(db);
+    await supabase.auth.signOut();
   },
 
   getEntries: async (userId: string): Promise<JournalEntry[]> => {
-    return getDB().entries.filter(e => e.user_id === userId);
+    const { data, error } = await supabase
+      .from('journal_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+    
+    if (error) {
+      console.error("Supabase Error:", error);
+      return [];
+    }
+    return data || [];
   },
 
   upsertEntry: async (entry: Partial<JournalEntry> & { user_id: string; date: string }): Promise<JournalEntry> => {
-    const db = getDB();
-    const existingIndex = db.entries.findIndex(e => e.user_id === entry.user_id && e.date === entry.date);
-    
-    let updatedEntry: JournalEntry;
-    if (existingIndex > -1) {
-      updatedEntry = { 
-        ...db.entries[existingIndex], 
-        ...entry, 
-        updated_at: new Date().toISOString() 
-      };
-      db.entries[existingIndex] = updatedEntry;
-    } else {
-      updatedEntry = {
-        id: crypto.randomUUID(),
-        title: entry.title || '',
-        content: entry.content || '',
-        mood: entry.mood ?? null,
-        user_id: entry.user_id,
-        date: entry.date,
-        created_at: new Date().toISOString(),
+    const { data, error } = await supabase
+      .from('journal_entries')
+      .upsert({ 
+        ...entry,
         updated_at: new Date().toISOString()
-      } as JournalEntry;
-      db.entries.push(updatedEntry);
-    }
-    saveDB(db);
-    return updatedEntry;
+      }, { onConflict: 'user_id,date' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 
   getActivities: async (userId: string, date: string): Promise<Activity[]> => {
-    return getDB().activities.filter(a => a.user_id === userId && a.entry_date === date);
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('entry_date', date);
+    
+    if (error) return [];
+    return data || [];
   },
 
   addActivity: async (activity: Omit<Activity, 'id' | 'created_at'>): Promise<Activity> => {
-    const db = getDB();
-    const newActivity: Activity = {
-      ...activity,
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString()
-    };
-    db.activities.push(newActivity);
-    saveDB(db);
-    return newActivity;
+    const { data, error } = await supabase
+      .from('activities')
+      .insert([activity])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   },
 
   deleteActivity: async (id: string) => {
-    const db = getDB();
-    db.activities = db.activities.filter(a => a.id !== id);
-    saveDB(db);
+    await supabase.from('activities').delete().eq('id', id);
   },
 
   getTasks: async (userId: string, date: string): Promise<Task[]> => {
-    return getDB().tasks.filter(t => t.user_id === userId && t.entry_date === date);
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('entry_date', date)
+      .order('created_at', { ascending: true });
+    
+    if (error) return [];
+    return data || [];
   },
 
   addTask: async (task: Omit<Task, 'id' | 'created_at'>): Promise<Task> => {
-    const db = getDB();
-    const newTask: Task = {
-      ...task,
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString()
-    };
-    db.tasks.push(newTask);
-    saveDB(db);
-    return newTask;
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([task])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   },
 
   toggleTask: async (id: string): Promise<void> => {
-    const db = getDB();
-    const taskIndex = db.tasks.findIndex(t => t.id === id);
-    if (taskIndex > -1) {
-      db.tasks[taskIndex].completed = !db.tasks[taskIndex].completed;
-      saveDB(db);
+    // Note: This requires getting current state first or using a RPC/raw JS logic
+    // For simplicity, we fetch and update
+    const { data: task } = await supabase.from('tasks').select('completed').eq('id', id).single();
+    if (task) {
+      await supabase.from('tasks').update({ completed: !task.completed }).eq('id', id);
     }
   },
 
   deleteTask: async (id: string): Promise<void> => {
-    const db = getDB();
-    db.tasks = db.tasks.filter(t => t.id !== id);
-    saveDB(db);
+    await supabase.from('tasks').delete().eq('id', id);
   }
 };
