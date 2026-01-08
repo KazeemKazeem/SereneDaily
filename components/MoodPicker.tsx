@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MoodValue } from '../types';
+import { MoodValue } from '../types.ts';
 
 const moods: { value: MoodValue; emoji: string; label: string }[] = [
   { value: 1, emoji: '😢', label: 'Awful' },

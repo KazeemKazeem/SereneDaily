@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { JournalEntry, Activity, Task, User, MoodValue } from '../types';
+import { JournalEntry, Activity, Task, User, MoodValue } from '../types.ts';
 
 const SUPABASE_URL = 'https://vylgegxwfgztliwnhbtn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5bGdlZ3h3Zmd6dGxpd25oYnRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTEzMjYsImV4cCI6MjA3NDcyNzMyNn0.yvDcP0pMSHMmYS_2-khO-88TMLQhS5f8WraofMgjyco';
@@ -121,8 +121,6 @@ export const dbService = {
   },
 
   toggleTask: async (id: string): Promise<void> => {
-    // Note: This requires getting current state first or using a RPC/raw JS logic
-    // For simplicity, we fetch and update
     const { data: task } = await supabase.from('tasks').select('completed').eq('id', id).single();
     if (task) {
       await supabase.from('tasks').update({ completed: !task.completed }).eq('id', id);

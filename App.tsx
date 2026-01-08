@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { dbService, supabase } from './services/db';
-import { User } from './types';
+import { dbService, supabase } from './services/db.ts';
+import { User } from './types.ts';
 
 // Screens
-import Dashboard from './screens/Dashboard';
-import JournalEditor from './screens/JournalEditor';
-import Calendar from './screens/Calendar';
-import Insights from './screens/Insights';
-import Profile from './screens/Profile';
-import Auth from './screens/Auth';
-import Onboarding from './screens/Onboarding';
+import Dashboard from './screens/Dashboard.tsx';
+import JournalEditor from './screens/JournalEditor.tsx';
+import Calendar from './screens/Calendar.tsx';
+import Insights from './screens/Insights.tsx';
+import Profile from './screens/Profile.tsx';
+import Auth from './screens/Auth.tsx';
+import Onboarding from './screens/Onboarding.tsx';
 
 // Context
 interface AppContextType {
